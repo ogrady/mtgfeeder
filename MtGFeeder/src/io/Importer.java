@@ -1,9 +1,11 @@
 package io;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -14,7 +16,9 @@ import java.util.List;
  * @author Daniel
  *
  */
-public class Importer {
+final public class Importer {
+	private static final String DUMMY_DUMP_NAME = "mtg_feeder.dump";
+	private Importer(){}
 	
 	/**
 	 * Reads the contents of a file.<br>
@@ -105,9 +109,52 @@ public class Importer {
 		return input;
 	}
 	
+	/**
+	 * Dumps a list of strings to a file (line by line).<br>
+	 * Is quite error-prone as it tries to recover from potential errors:<p>
+	 * when specifying a directory instead of a file it will create a file called {@value #DUMMY_DUMP_NAME} in that directory<br>
+	 * when failing to access the file at all it will at least dump the values to the error-stream to leave it for the user to copy and recover it himself
+	 * </p>
+	 * @param file file to dump the lines in
+	 * @param lines list of lines to dump to the file
+	 */
+	public static void dump(File file, List<String> lines) {
+		if(file.isDirectory()) {
+			System.err.println(String.format("Can not dump to directory. Attempting to dump into dummy-file '%s'.", file.getAbsolutePath()+File.separator+DUMMY_DUMP_NAME));
+			dump(new File(file.getAbsolutePath()+File.separator+DUMMY_DUMP_NAME), lines);
+		} else {
+			BufferedWriter writer = null;
+			try {
+				writer = new BufferedWriter(new FileWriter(file));
+				for(String line : lines) {
+					try {
+						writer.write(line+"\r\n");
+					} catch(IOException ioe) {
+						System.err.println(String.format("Could not write '%s' to file because an error occured: '%s'. Attempting to proceed with further lines.", line, ioe.getMessage()));
+					}
+				}
+				writer.flush();
+			} catch (IOException e) {
+				System.err.println(String.format("Could not access file '%s' because an error occured: '%s'. Dumping contents to error-stream:", file.getAbsolutePath(), e.getMessage()));
+				for(String line : lines) {
+					System.err.println(line);
+				}
+			} finally {
+				if(writer != null) {
+					try {
+						writer.close();
+					} catch (IOException e) {
+						System.err.println(String.format("Critical error when trying to close input-file '%s':\r\n'%s'", file.getAbsolutePath(), e.getMessage()));
+					}
+				}
+			}
+		}
+	}
+	
 	public static void main(String[] args) {
 		List<String> input = Importer.readDirectory(new File("C:\\Users\\Daniel\\git\\mtgfeeder\\MtGFeeder\\"), new FileExtensionFilter("tsv"), "\t");
 		for(String s : input)
 			System.out.println(s);
+		Importer.dump(new File("C:\\Users\\Daniel\\Desktop"), input);
 	}
 }
